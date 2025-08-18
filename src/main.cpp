@@ -14,8 +14,14 @@
 ATOM_PRINTER printer;
 
 uint8_t buffer[IMAGE_HEIGHT][MAX_WIDTH / 8];             // Buffer for the bitmap data
-uint8_t fontFullBitmaps[5][FONT_HEIGHT][FONT_WIDTH / 8]; // Array to hold font bitmaps
+uint8_t fontFullBitmaps[2][FONT_HEIGHT][FONT_WIDTH / 8]; // Array to hold font bitmaps
 uint8_t fontHalfBitmaps[2][FONT_HEIGHT][FONT_WIDTH / 2 / 8];
+
+uint8_t testImage[255][255];
+uint8_t testImageWidth;
+uint8_t testImageHeight;
+
+bool isTestImageLoaded = false;
 
 void setup()
 {
@@ -24,31 +30,37 @@ void setup()
   Serial.begin(115200);
   printer.begin(&Serial2);
 
-  for (int i = 0; i < 5; i++)
+  auto testFile = SPIFFS.open("/test.bin");
+  testImageWidth = testFile.read();
+  testImageHeight = testFile.read();
+  auto readLen = testFile.read((uint8_t *)testImage, sizeof(testImage));
+  testFile.close();
+  auto needReadLen = (testImageWidth * testImageHeight) / 8;
+  if (readLen >= needReadLen)
   {
-    auto file = SPIFFS.open("/" + String(i) + ".bin", "r");
-    if (file)
-    {
-      auto readLen = file.read((uint8_t *)fontFullBitmaps[i], sizeof(fontFullBitmaps[i]));
-      if (readLen != sizeof(fontFullBitmaps[i]))
-      {
-        Serial.printf("Error reading font file %d, read %d bytes\n", i, readLen);
-      }
-      else
-      {
-        Serial.printf("Font file %d loaded successfully\n", i);
-      }
-    }
-    else
-    {
-      Serial.printf("Failed to open font file %d\n", i);
-    }
-
-    // uint8_t cmd[] = {0x1b, 0x23, 0x23, 0x51, 0x50, 0x49, 0x58, 24};
-    // Serial2.write(cmd, sizeof(cmd));
-    Serial2.print("\x1b##QPIX");
-    Serial2.write(6);
+    Serial.printf("Read test image: %d bytes, expected: %d bytes\n", readLen, needReadLen);
+    isTestImageLoaded = true;
   }
+  else
+  {
+    Serial.printf("Error reading test image, read %d bytes but expected %d bytes\n", readLen, needReadLen);
+  }
+
+  auto fullFontFile = SPIFFS.open("/test2.bin");
+
+  readLen = fullFontFile.read((uint8_t *)fontFullBitmaps, sizeof(fontFullBitmaps));
+
+  if (readLen == sizeof(fontFullBitmaps))
+  {
+    Serial.println("Full font bitmaps loaded successfully.");
+  }
+  else
+  {
+    Serial.printf("Error reading full font bitmaps, read %d bytes\n", readLen);
+  }
+
+  Serial2.print("\x1b##QPIX");
+  Serial2.write(6);
 
   while (!Serial2 || !Serial) // Wait for Serial to be ready
   {
@@ -86,16 +98,11 @@ void loop()
         Serial.println("Invalid character: " + String(c));
       }
     }
-    printer.printBMP(0, MAX_WIDTH, FONT_WIDTH, (uint8_t *)buffer);
+    printer.printBMP(0, MAX_WIDTH, FONT_HEIGHT, (uint8_t *)buffer);
   }
-  if (M5.BtnA.wasPressed())
+  if (M5.BtnA.wasPressed() && isTestImageLoaded)
   {
-    printer.printPos(50);
-
-    Serial2.write(0x1b);
-    Serial2.print('a');
-    Serial2.write(0x01);
-    printer.printQRCode("https://example.com");
+    printer.printBMP(0, testImageWidth, testImageHeight, (uint8_t *)testImage);
   }
   delay(50);
 }
