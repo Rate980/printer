@@ -2,6 +2,7 @@
 #include <M5Unified.h>
 #include <ATOM_PRINTER.h>
 #include <SPIFFS.h>
+#include "rect.hpp"
 
 #define FILE_PATH "/test.bin"
 #define MAX_WIDTH 384
@@ -9,19 +10,41 @@
 
 #define FONT_WIDTH 48
 #define FONT_HEIGHT 70
+#define FULL_FONT_COUNT 2
+#define HALF_FONT_COUNT 2
 #define MAX_LENGTH (MAX_WIDTH / FONT_WIDTH)
 
 ATOM_PRINTER printer;
 
-uint8_t buffer[IMAGE_HEIGHT][MAX_WIDTH / 8];             // Buffer for the bitmap data
-uint8_t fontFullBitmaps[2][FONT_HEIGHT][FONT_WIDTH / 8]; // Array to hold font bitmaps
-uint8_t fontHalfBitmaps[2][FONT_HEIGHT][FONT_WIDTH / 2 / 8];
+uint8_t buffer[IMAGE_HEIGHT * MAX_WIDTH / 8]; // Buffer for the bitmap data
+Rect bufferRect = Rect(MAX_WIDTH, IMAGE_HEIGHT);
+uint8_t fontFullBitmaps[FULL_FONT_COUNT][FONT_HEIGHT * FONT_WIDTH / 8]; // Array to hold font bitmaps
+uint8_t fontHalfBitmaps[HALF_FONT_COUNT][FONT_HEIGHT * FONT_WIDTH / 2 / 8];
+Rect fontFullRect = Rect(FONT_WIDTH, FONT_HEIGHT);
+Rect fontHalfRect = Rect(FONT_WIDTH / 2, FONT_HEIGHT);
 
-uint8_t testImage[255][255];
+uint8_t testImage[256 * 256];
 uint8_t testImageWidth;
 uint8_t testImageHeight;
 
 bool isTestImageLoaded = false;
+
+void writeBitmapToBuffer(Rect bitmapRect, uint8_t *bitmap, Rect bufferRect, uint8_t *buffer, Point offset = Point(0, 0))
+{
+  for (auto y = 0; y < bitmapRect.height; y++)
+  {
+    auto distY = y + offset.y;
+    auto bufferRowOffset = distY * bufferRect.width;
+    auto bufferPixelOffset = bufferRowOffset + offset.x;
+
+    auto bitmapRowOffset = y * bitmapRect.width;
+
+    memcpy(
+        buffer + bufferPixelOffset / 8,
+        bitmap + bitmapRowOffset / 8,
+        bitmapRect.width / 8);
+  }
+}
 
 void setup()
 {
@@ -88,10 +111,8 @@ void loop()
       int cIndex = String(c).toInt();
       if (cIndex >= 0 && cIndex < 5)
       {
-        for (int j = 0; j < FONT_HEIGHT; j++)
-        {
-          memcpy(buffer[j] + (i * FONT_WIDTH / 8), fontFullBitmaps[cIndex][j], FONT_WIDTH / 8);
-        }
+        auto offset = Point(i * FONT_WIDTH, 0);
+        writeBitmapToBuffer(fontFullRect, fontFullBitmaps[cIndex], bufferRect, buffer, offset);
       }
       else
       {
@@ -102,7 +123,7 @@ void loop()
   }
   if (M5.BtnA.wasPressed() && isTestImageLoaded)
   {
-    printer.printBMP(0, testImageWidth, testImageHeight, (uint8_t *)testImage);
+    printer.printBMP(0, testImageWidth, testImageHeight, testImage);
   }
   delay(50);
 }
