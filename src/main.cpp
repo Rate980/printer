@@ -46,6 +46,24 @@ void writeBitmapToBuffer(Rect bitmapRect, uint8_t *bitmap, Rect bufferRect, uint
   }
 }
 
+void makeImage(int16_t *String, int length)
+{
+  for (int y = 0; y < FONT_HEIGHT; y++)
+  {
+    auto bufferRowOffset = y * MAX_WIDTH;
+    memset(buffer + bufferRowOffset / 8, 0, MAX_WIDTH / 8); // Clear the buffer for the current row
+  }
+  for (int i = 0; i < length; i++)
+  {
+    auto c = String[i];
+    if (c >= 0 && c < FULL_FONT_COUNT)
+    {
+      auto offset = Point(i * FONT_WIDTH, 0);
+      writeBitmapToBuffer(fontFullRect, fontFullBitmaps[c], bufferRect, buffer, offset);
+    }
+  }
+}
+
 void setup()
 {
   M5.begin();
@@ -98,25 +116,21 @@ void loop()
   M5.update();
   if (Serial.available())
   {
-    auto input = Serial.readStringUntil('\n');
-    input.trim();
-    if (input.length() > MAX_LENGTH)
+    int16_t input[10];
+    auto readLen = Serial.readBytesUntil('\n', (char *)input, sizeof(input));
+    for (auto i = 0; i < readLen; i++)
     {
-      input = input.substring(0, MAX_LENGTH);
-    }
-    memset(buffer, 0, sizeof(buffer));
-    for (int i = 0; i < input.length(); i++)
-    {
-      auto c = input.charAt(i);
-      int cIndex = String(c).toInt();
-      if (cIndex >= 0 && cIndex < 5)
+      uint8_t testBuf[(MAX_WIDTH * FONT_HEIGHT) / 8];
+      Rect testRect = Rect(MAX_WIDTH, FONT_HEIGHT);
+      int cIndex = input[i];
+      if (cIndex >= 0 && cIndex < FULL_FONT_COUNT)
       {
         auto offset = Point(i * FONT_WIDTH, 0);
-        writeBitmapToBuffer(fontFullRect, fontFullBitmaps[cIndex], bufferRect, buffer, offset);
+        writeBitmapToBuffer(fontFullRect, fontFullBitmaps[cIndex], testRect, testBuf, offset);
       }
       else
       {
-        Serial.println("Invalid character: " + String(c));
+        Serial.println("Invalid character: " + String(cIndex));
       }
     }
     printer.printBMP(0, MAX_WIDTH, FONT_HEIGHT, (uint8_t *)buffer);
