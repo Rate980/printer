@@ -14,6 +14,8 @@
 #define HALF_FONT_COUNT 2
 #define MAX_LENGTH (MAX_WIDTH / FONT_WIDTH)
 
+#define CHARACTER_TOP_Y 58
+
 ATOM_PRINTER printer;
 
 uint8_t buffer[IMAGE_HEIGHT * MAX_WIDTH / 8]; // Buffer for the bitmap data
@@ -23,6 +25,8 @@ uint8_t fontHalfBitmaps[HALF_FONT_COUNT][FONT_HEIGHT * FONT_WIDTH / 2 / 8];
 Rect fontFullRect = Rect(FONT_WIDTH, FONT_HEIGHT);
 Rect fontHalfRect = Rect(FONT_WIDTH / 2, FONT_HEIGHT);
 
+int16_t messagePrefix[] = {55, 1917, 1366}; // の勇者
+size_t messagePrefixLength = sizeof(messagePrefix) / sizeof(messagePrefix[0]);
 uint8_t testImage[256 * 256];
 uint8_t testImageWidth;
 uint8_t testImageHeight;
@@ -48,20 +52,26 @@ void writeBitmapToBuffer(Rect bitmapRect, uint8_t *bitmap, Rect bufferRect, uint
 
 void makeImage(int16_t *String, int length)
 {
-  for (int y = 0; y < FONT_HEIGHT; y++)
+  memset(buffer + (CHARACTER_TOP_Y * MAX_WIDTH / 8), 0, MAX_WIDTH * FONT_HEIGHT / 8); // Clear the buffer for the current row
+  auto stringMaxLength = MAX_LENGTH - messagePrefixLength - 1;                        //-1は括弧の分
+  if (length > stringMaxLength)
   {
-    auto bufferRowOffset = y * MAX_WIDTH;
-    memset(buffer + bufferRowOffset / 8, 0, MAX_WIDTH / 8); // Clear the buffer for the current row
+    length = stringMaxLength;
   }
+
+  auto xOffset = (MAX_WIDTH - length + messagePrefixLength + 1) / 2;                                          // 中央揃え 1は括弧
+  writeBitmapToBuffer(fontHalfRect, fontHalfBitmaps[0], bufferRect, buffer, Point(xOffset, CHARACTER_TOP_Y)); // 【
+  xOffset += FONT_WIDTH / 2;                                                                                  // 半分の幅を加算
   for (int i = 0; i < length; i++)
   {
     auto c = String[i];
     if (c >= 0 && c < FULL_FONT_COUNT)
     {
-      auto offset = Point(i * FONT_WIDTH, 0);
+      auto offset = Point(i * FONT_WIDTH + xOffset, CHARACTER_TOP_Y);
       writeBitmapToBuffer(fontFullRect, fontFullBitmaps[c], bufferRect, buffer, offset);
     }
   }
+  writeBitmapToBuffer(fontHalfRect, fontHalfBitmaps[1], bufferRect, buffer, Point(xOffset + length * FONT_WIDTH, CHARACTER_TOP_Y)); // 】
 }
 
 void setup()
@@ -98,6 +108,18 @@ void setup()
   else
   {
     Serial.printf("Error reading full font bitmaps, read %d bytes\n", readLen);
+  }
+
+  fullFontFile.close();
+  auto halfFontFile = SPIFFS.open("/half.bin");
+  readLen = halfFontFile.read((uint8_t *)fontHalfBitmaps, sizeof(fontHalfBitmaps));
+  if (readLen == sizeof(fontHalfBitmaps))
+  {
+    Serial.println("Half font bitmaps loaded successfully.");
+  }
+  else
+  {
+    Serial.printf("Error reading half font bitmaps, read %d bytes\n", readLen);
   }
 
   Serial2.print("\x1b##QPIX");
@@ -137,7 +159,9 @@ void loop()
   }
   if (M5.BtnA.wasPressed() && isTestImageLoaded)
   {
-    printer.printBMP(0, testImageWidth, testImageHeight, testImage);
+    auto testbufferRect = Rect(256, 256);
+    writeBitmapToBuffer(Rect(testImageWidth, testImageHeight), testImage, testbufferRect, buffer);
+    printer.printBMP(0, 256, 256, buffer);
   }
   delay(50);
 }
