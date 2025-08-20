@@ -33,3 +33,23 @@ def image2testdata(image):
     ret.append(image.get_height().to_bytes(1))
     ret.extend(image2bytes(image))
     return bytes(ret)
+
+
+import csv
+import time
+
+with open(
+    r"D:\Ratei\Documents\PlatformIO\Projects\printer\code.csv", encoding="utf8"
+) as f:
+    reader = csv.reader(f)
+    data = [x for x in reader][0]
+
+image = Gimp.get_images()[0]
+text = image.get_layers()[0]
+
+
+with open("full.bin", "wb") as f:
+    for character in data:
+        text.set_text(character)
+        f.write(image2bytes(image))
+        time.sleep(1 / 1000)  # Sleep for 10ms to avoid Gimp freezing

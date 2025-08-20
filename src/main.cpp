@@ -10,7 +10,7 @@
 
 #define FONT_WIDTH 48
 #define FONT_HEIGHT 70
-#define FULL_FONT_COUNT 2
+#define FULL_FONT_COUNT 10
 #define HALF_FONT_COUNT 2
 #define MAX_LENGTH (MAX_WIDTH / FONT_WIDTH)
 
@@ -97,7 +97,7 @@ void setup()
     Serial.printf("Error reading test image, read %d bytes but expected %d bytes\n", readLen, needReadLen);
   }
 
-  auto fullFontFile = SPIFFS.open("/test2.bin");
+  auto fullFontFile = SPIFFS.open("/full.bin");
 
   readLen = fullFontFile.read((uint8_t *)fontFullBitmaps, sizeof(fontFullBitmaps));
 
@@ -160,7 +160,11 @@ void loop()
   if (M5.BtnA.wasPressed() && isTestImageLoaded)
   {
     auto testbufferRect = Rect(256, 256);
-    writeBitmapToBuffer(Rect(testImageWidth, testImageHeight), testImage, testbufferRect, buffer);
+    // writeBitmapToBuffer(Rect(testImageWidth, testImageHeight), testImage, testbufferRect, buffer, Point(50, 50));
+    //
+    for (int i = 0; i < messagePrefixLength; i++)
+    {
+    }
     printer.printBMP(0, 256, 256, buffer);
   }
   delay(50);
