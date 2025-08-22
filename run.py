@@ -1,9 +1,7 @@
 import csv
 import json
 
-with open(
-    r"D:\Ratei\Documents\PlatformIO\Projects\printer\code.csv", encoding="utf8"
-) as f:
+with open(r"code.csv", encoding="utf8") as f:
     reader = csv.reader(f)
     data = [x for x in reader][0]
 
